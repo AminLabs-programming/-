@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -16,18 +17,46 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Accept Android licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.3.1
 
-      - name: Accept Android licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+      - name: Create .env.example and .env
+        run: |
+          echo "GEMINI_API_KEY=MY_GEMINI_API_KEY" > .env.example
+          echo "GEMINI_API_KEY=MY_GEMINI_API_KEY" > .env
 
-      - name: Create .env
-        run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+      - name: Create debug keystore
+        run: |
+          rm -f debug.keystore
+          keytool -genkeypair -keystore debug.keystore \
+            -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
+      # لاگ کامل در فایل ذخیره می‌شود تا علت واقعی خطا پیدا شود
       - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon --no-configuration-cache --no-build-cache \
+            -x lint -x test 2>&1 | tee build-log.txt
+
+      - name: Show real errors (only if build failed)
+        if: failure()
+        run: |
+          echo "=========== خطاهای کاتلین (خطوط e:) ==========="
+          grep -n "^e: " build-log.txt | head -40 || true
+          echo "=========== What went wrong ==========="
+          grep -n -A 8 "What went wrong" build-log.txt | head -60 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build-log.txt
 
       - uses: actions/upload-artifact@v4
         with:
