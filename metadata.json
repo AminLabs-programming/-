@@ -1,0 +1,6 @@
+{
+  "name": "CONTINUE",
+  "description": "سامانه مینیمال، مدرن و اختصاصی پیگیری استمرار مطالعه تا کنکور و ثبت دفتر اعمال روزانه",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
